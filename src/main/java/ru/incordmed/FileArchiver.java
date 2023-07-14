@@ -23,7 +23,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private String folderForDeletedFiles;
 
     public void calculateFolders(int year, int month) {
-        this.mainDirectoryWithFiles = getPathToProgramDirectory().getParent();
+        this.mainDirectoryWithFiles = getPathToProgramDirectory();
         this.folderFileCounts = new HashMap<>();
         // todo удалить, когда будет добавлено полноценное удаление файлов
         folderForDeletedFiles = mainDirectoryWithFiles + File.separator + "deleted";
@@ -38,18 +38,27 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     }
 
     public Path getPathToProgramDirectory() {
-        return Path.of(System.getProperty("user.dir"));
+        return Paths.get(System.getProperty("user.dir"));
+    }
+
+    private void setFileCreationDate(int year, int month) throws IncorrectDateException {
+        if (year < 0) {
+            throw new IncorrectDateException("Некорректный год: " + year);
+        } else if (month < 1 || month > 12) {
+            throw new IncorrectDateException("Некорректный месяц: " + month);
+        }
+        this.fileCreationDate = LocalDate.of(year, month, 1);
+        System.out.println("\nПоиск по дате создания файла: " + fileCreationDate);
     }
 
     @Override
     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-        if (dir.getFileName()
-                .equals(getPathToProgramDirectory().getFileName())
-                || dir.getFileName().toString().equals("deleted")) {
+        if (dir.toString()
+                .equals(mainDirectoryWithFiles
+                        + File.separator + "deleted")) {
             return FileVisitResult.SKIP_SUBTREE;
         } // todo убрать упоминание папки deleted в будущем
-        Path path = mainDirectoryWithFiles.relativize(dir);
-        int depth = path.getNameCount();
+        int depth = getDepth(dir);
         if (depth == 1) {
             System.out.println("\nНазвание папки: " + dir.getFileName());
         } else if (depth == 2) {
@@ -58,24 +67,46 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         return FileVisitResult.CONTINUE;
     }
 
+    private int getDepth(Path dir) {
+        return mainDirectoryWithFiles.relativize(dir).getNameCount();
+    }
+
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        System.out.println("\nФайл: " + file.getFileName()
-                + "\nДата создания: " + attrs.creationTime()
-                + "\nРодительская директория: " + file.getParent());
-        if (isFileBeforeCreationDate(attrs)) {
-            System.out.println("Файл " + file.getFileName() + " будет добавлен в архив");
-            increaseNumberFilesInFolder(file);
+        if (getDepth(file) == 3) {
+            System.out.println("\nФайл: " + file.getFileName()
+                    + "\nДата создания: " + attrs.creationTime()
+                    + "\nРодительская директория: " + file.getParent());
+            if (isFileBeforeCreationDate(attrs)) {
+                System.out.println("Файл " + file.getFileName()
+                        + " будет добавлен в архив");
+                increaseNumberFilesInFolder(file);
+            }
         }
 
         return FileVisitResult.CONTINUE;
     }
 
+    private boolean isFileBeforeCreationDate(BasicFileAttributes attrs) {
+        LocalDate creationTime = attrs.creationTime()
+                .toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        return creationTime.isBefore(fileCreationDate);
+    }
+
+    private void increaseNumberFilesInFolder(Path folderPath) {
+        if (folderFileCounts.get(folderPath.getParent()) == null) {
+            List<Path> paths = new ArrayList<>();
+            paths.add(folderPath);
+            folderFileCounts.put(folderPath.getParent(), paths);
+        } else {
+            folderFileCounts.get(folderPath.getParent()).add(folderPath);
+        }
+    }
+
     @Override
     public FileVisitResult postVisitDirectory(Path dir, IOException exc)
             throws IOException {
-        int depth = mainDirectoryWithFiles.relativize(dir).getNameCount();
-        if (depth == 2) {
+        if (getDepth(dir) == 2) {
             int numberFiles = folderFileCounts.get(dir) != null
                     ? folderFileCounts.get(dir).size()
                     : 0;
@@ -110,6 +141,13 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
+    private Path getStorageFolderPath(Path dir, String folder) throws IOException {
+        Path archivePath = Paths.get(folder + File.separator
+                + dir.getParent().getFileName());
+        Files.createDirectories(archivePath);
+        return archivePath;
+    }
+
     private void addingFilesToZip(Path dir, Path pathDeletedFolders,
                                   ZipOutputStream zipOutputStream)
             throws IOException {
@@ -125,39 +163,6 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
                     + " в папку для удаленных файлов");
             Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
                     + dir.getFileName() + File.separator + fileToZip.getFileName()));
-        }
-    }
-
-    private Path getStorageFolderPath(Path dir, String folder) throws IOException {
-        Path archivePath = Paths.get(folder + File.separator
-                + dir.getParent().getFileName());
-        Files.createDirectories(archivePath);
-        return archivePath;
-    }
-
-    private boolean isFileBeforeCreationDate(BasicFileAttributes attrs) {
-        LocalDate creationTime = attrs.creationTime()
-                .toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        return creationTime.isBefore(fileCreationDate);
-    }
-
-    private void setFileCreationDate(int year, int month) throws IncorrectDateException {
-        if (year < 0) {
-            throw new IncorrectDateException("Некорректный год: " + year);
-        } else if (month < 1 || month > 12) {
-            throw new IncorrectDateException("Некорректный месяц: " + month);
-        }
-        this.fileCreationDate = LocalDate.of(year, month, 1);
-        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
-    }
-
-    private void increaseNumberFilesInFolder(Path folderPath) {
-        if (folderFileCounts.get(folderPath.getParent()) == null) {
-            List<Path> paths = new ArrayList<>();
-            paths.add(folderPath);
-            folderFileCounts.put(folderPath.getParent(), paths);
-        } else {
-            folderFileCounts.get(folderPath.getParent()).add(folderPath);
         }
     }
 }
