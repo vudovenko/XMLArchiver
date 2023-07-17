@@ -1,17 +1,16 @@
 package ru.incordmed;
 
 import ru.incordmed.exceptions.IncorrectDateException;
+import ru.incordmed.exceptions.MissingPropertiesFileException;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -22,18 +21,19 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private Map<Path, List<Path>> folderFileCounts;
     private String folderForDeletedFiles;
 
-    public void calculateFolders(int year, int month) {
+    public void calculateFolders() {
         this.mainDirectoryWithFiles = getPathToProgramDirectory();
         this.folderFileCounts = new HashMap<>();
         // todo удалить, когда будет добавлено полноценное удаление файлов
         folderForDeletedFiles = mainDirectoryWithFiles + File.separator + "deleted";
         try {
-            setFileCreationDate(year, month);
+            setFileCreationDate(LocalDate.now().getYear(), readSEMDMonthFromProperties());
             System.out.println("\nНачало обхода файловой системы...");
             Files.walkFileTree(mainDirectoryWithFiles, this);
             System.out.println("\nОбход файловой системы завершен.");
         } catch (IncorrectDateException | IOException e) {
             e.printStackTrace();
+            System.exit(1);
         }
     }
 
@@ -49,6 +49,21 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
         this.fileCreationDate = LocalDate.of(year, month, 1);
         System.out.println("\nПоиск по дате создания файла: " + fileCreationDate);
+    }
+
+    private int readSEMDMonthFromProperties() throws IOException {
+        Properties properties = new Properties();
+        try (InputStream inputStream = getClass().getResourceAsStream("/vimis_archive.properties")) {
+            if (inputStream != null) {
+                System.out.println("Файл vimis_archive.properties найден.");
+                properties.load(inputStream);
+                String semdMonthString = properties.getProperty("semd.month");
+                System.out.println("Получили месяц создания файла: " + semdMonthString);
+                return Integer.parseInt(semdMonthString);
+            } else {
+                throw new MissingPropertiesFileException("Файл vimis_archive.properties не найден.");
+            }
+        }
     }
 
     @Override
@@ -123,8 +138,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         Path pathDeletedFolders = getStorageFolderPath(dir, folderForDeletedFiles);
 
         Path archiveName = Paths.get(dir + File.separator
-                + dir.getFileName() + ".zip");
-        System.out.println("\nСоздание архива для файлов " + archiveName);
+                + getArchiveName(dir));
+        System.out.println("\nСоздание архива для файлов: " + archiveName);
         try (ZipOutputStream zipOutputStream
                      = new ZipOutputStream(
                 Files.newOutputStream(archiveName))) {
@@ -146,6 +161,19 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
                 + dir.getParent().getFileName());
         Files.createDirectories(archivePath);
         return archivePath;
+    }
+
+    private String getArchiveName(Path dir) {
+        /*
+            Пример, СЭМДы номер 1 за июнь 2023:
+            2023_06_1_OutputQueryLost.zip
+        */
+        // todo нужно ли проверить парсинг номера СЭМДа?
+        return fileCreationDate.getYear() + "_"
+                + String.format("%02d", fileCreationDate.getMonthValue()) + "_"
+                + Integer.parseInt(dir.getFileName().toString()) + "_"
+                + dir.getParent().getFileName().toString()
+                + ".zip";
     }
 
     private void addingFilesToZip(Path dir, Path pathDeletedFolders,

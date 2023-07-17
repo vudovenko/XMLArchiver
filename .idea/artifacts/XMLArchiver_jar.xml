@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="XMLArchiver:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/XMLArchiver_jar</output-path>
+    <root id="archive" name="XMLArchiver.jar">
+      <element id="module-output" name="XMLArchiver" />
+    </root>
+  </artifact>
+</component>
