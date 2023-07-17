@@ -169,11 +169,11 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             2023_06_1_OutputQueryLost.zip
         */
         // todo нужно ли проверить парсинг номера СЭМДа?
-        return fileCreationDate.getYear() + "_"
-                + String.format("%02d", fileCreationDate.getMonthValue()) + "_"
-                + Integer.parseInt(dir.getFileName().toString()) + "_"
-                + dir.getParent().getFileName().toString()
-                + ".zip";
+        return String.format("%d_%02d_%d_%s.zip",
+                fileCreationDate.getYear(),
+                fileCreationDate.getMonthValue(),
+                Integer.parseInt(dir.getFileName().toString()),
+                dir.getParent().getFileName().toString());
     }
 
     private void addingFilesToZip(Path dir, Path pathDeletedFolders,
