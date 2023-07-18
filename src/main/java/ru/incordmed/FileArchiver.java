@@ -19,6 +19,12 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private LocalDate fileCreationDate;
     private Path mainDirectoryWithFiles;
     private Map<Path, List<Path>> folderFileCounts;
+    private final Set<String> foldersWithoutStructure
+            = new HashSet<>(Arrays.asList(
+            "AsynchronousResponceLostCheckStatusArchive",
+            "AsynchronousResponceSendResultArchive",
+            "AsynchronousResponceSendResultUnnecessary",
+            "log_vimis"));
     private String folderForDeletedFiles;
 
     public void calculateFolders() {
@@ -88,7 +94,9 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        if (getDepth(file) == 3) {
+        if (getDepth(file) == 3
+                || foldersWithoutStructure
+                .contains(file.getParent().getFileName().toString())) {
             System.out.println("\nФайл: " + file.getFileName()
                     + "\nДата создания: " + attrs.creationTime()
                     + "\nРодительская директория: " + file.getParent());
@@ -121,7 +129,9 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     @Override
     public FileVisitResult postVisitDirectory(Path dir, IOException exc)
             throws IOException {
-        if (getDepth(dir) == 2) {
+        if (getDepth(dir) == 2
+                || foldersWithoutStructure
+                .contains(dir.getFileName().toString())) {
             int numberFiles = folderFileCounts.get(dir) != null
                     ? folderFileCounts.get(dir).size()
                     : 0;
