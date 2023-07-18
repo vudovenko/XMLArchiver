@@ -168,11 +168,10 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             Пример, СЭМДы номер 1 за июнь 2023:
             2023_06_1_OutputQueryLost.zip
         */
-        // todo нужно ли проверить парсинг номера СЭМДа?
-        return String.format("%d_%02d_%d_%s.zip",
+        return String.format("%d_%02d_%s_%s.zip",
                 fileCreationDate.getYear(),
                 fileCreationDate.getMonthValue(),
-                Integer.parseInt(dir.getFileName().toString()),
+                dir.getFileName().toString(),
                 dir.getParent().getFileName().toString());
     }
 
