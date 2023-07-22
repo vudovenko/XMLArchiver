@@ -19,12 +19,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private LocalDate fileCreationDate;
     private Path mainDirectoryWithFiles;
     private Map<Path, List<Path>> folderFileCounts;
-    private final Set<String> foldersWithoutStructure
-            = new HashSet<>(Arrays.asList(
-            "AsynchronousResponceLostCheckStatusArchive",
-            "AsynchronousResponceSendResultArchive",
-            "AsynchronousResponceSendResultUnnecessary",
-            "log_vimis"));
+    private Set<String> foldersWithoutStructure;
     private String folderForDeletedFiles;
 
     public void calculateFolders() {
@@ -33,7 +28,13 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         // todo удалить, когда будет добавлено полноценное удаление файлов
         folderForDeletedFiles = mainDirectoryWithFiles + File.separator + "deleted";
         try {
-            setFileCreationDate(LocalDate.now().getYear(), readSEMDMonthFromProperties());
+            int semdMonthString = Integer.parseInt(readFromProperties("semd.month"));
+            System.out.println("\nПолучили месяц создания файла: " + semdMonthString);
+            setFileCreationDate(LocalDate.now().getYear(), semdMonthString);
+
+            foldersWithoutStructure = getFoldersWithoutStructure();
+            System.out.println("\nПолучен список папок без структуры: " + foldersWithoutStructure);
+
             System.out.println("\nНачало обхода файловой системы...");
             Files.walkFileTree(mainDirectoryWithFiles, this);
             System.out.println("\nОбход файловой системы завершен.");
@@ -47,6 +48,27 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         return Paths.get(System.getProperty("user.dir"));
     }
 
+    private String readFromProperties(String propertyValue) {
+        Properties properties = new Properties();
+        try (InputStream inputStream = getClass().getResourceAsStream("/vimis_archive.properties")) {
+            if (inputStream != null) {
+                System.out.println("\nФайл vimis_archive.properties найден.");
+                properties.load(inputStream);
+                return properties.getProperty(propertyValue);
+            } else {
+                throw new MissingPropertiesFileException("\nФайл vimis_archive.properties не найден.");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private HashSet<String> getFoldersWithoutStructure() {
+        return new HashSet<>(Arrays.asList(
+                readFromProperties("semd.folders_without_structure")
+                        .split(",")));
+    }
+
     private void setFileCreationDate(int year, int month) throws IncorrectDateException {
         if (year < 0) {
             throw new IncorrectDateException("Некорректный год: " + year);
@@ -54,22 +76,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             throw new IncorrectDateException("Некорректный месяц: " + month);
         }
         this.fileCreationDate = LocalDate.of(year, month, 1);
-        System.out.println("\nПоиск по дате создания файла: " + fileCreationDate);
-    }
-
-    private int readSEMDMonthFromProperties() throws IOException {
-        Properties properties = new Properties();
-        try (InputStream inputStream = getClass().getResourceAsStream("/vimis_archive.properties")) {
-            if (inputStream != null) {
-                System.out.println("Файл vimis_archive.properties найден.");
-                properties.load(inputStream);
-                String semdMonthString = properties.getProperty("semd.month");
-                System.out.println("Получили месяц создания файла: " + semdMonthString);
-                return Integer.parseInt(semdMonthString);
-            } else {
-                throw new MissingPropertiesFileException("Файл vimis_archive.properties не найден.");
-            }
-        }
+        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
     }
 
     @Override
@@ -189,17 +196,23 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
                                   ZipOutputStream zipOutputStream)
             throws IOException {
         for (Path fileToZip : folderFileCounts.get(dir)) {
+//            BasicFileAttributes fileAttributes
+//                    = Files.readAttributes(fileToZip, BasicFileAttributes.class);
+
             ZipEntry zipEntry = new ZipEntry(fileToZip
                     .getFileName().toString());
+//            zipEntry.setCreationTime(fileAttributes.creationTime());
+
             System.out.println("Запись файла " + fileToZip
                     + " в архив");
             zipOutputStream.putNextEntry(zipEntry);
-            Files.copy(fileToZip, zipOutputStream); // Добавляем в архив
+            zipOutputStream.write(Files.readAllBytes(fileToZip)); // Добавляем в архив
+            zipOutputStream.closeEntry();
 
-            System.out.println("Перенос файла " + fileToZip
-                    + " в папку для удаленных файлов");
-            Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
-                    + dir.getFileName() + File.separator + fileToZip.getFileName()));
+//            System.out.println("Перенос файла " + fileToZip
+//                    + " в папку для удаленных файлов");
+//            Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
+//                    + dir.getFileName() + File.separator + fileToZip.getFileName()));
         }
     }
 }
