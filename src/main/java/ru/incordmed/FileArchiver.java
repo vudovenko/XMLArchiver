@@ -48,22 +48,22 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         return Paths.get(System.getProperty("user.dir"));
     }
 
-    private String readFromProperties(String propertyValue) {
+    private String readFromProperties(String propertyValue) throws MissingPropertiesFileException {
         Properties properties = new Properties();
-        try (InputStream inputStream = getClass().getResourceAsStream("/vimis_archive.properties")) {
-            if (inputStream != null) {
-                System.out.println("\nФайл vimis_archive.properties найден.");
-                properties.load(inputStream);
-                return properties.getProperty(propertyValue);
-            } else {
-                throw new MissingPropertiesFileException("\nФайл vimis_archive.properties не найден.");
-            }
+        String pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
+        try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
+            properties.load(inputStream);
+            System.out.println("\nФайл vimis_archive.properties найден." +
+                    "\nЕго путь: " + pathToPropertiesFile);
+            return properties.getProperty(propertyValue);
+
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new MissingPropertiesFileException(
+                    String.format("\nФайл vimis_archive.properties по пути %s не найден!", pathToPropertiesFile));
         }
     }
 
-    private HashSet<String> getFoldersWithoutStructure() {
+    private HashSet<String> getFoldersWithoutStructure() throws MissingPropertiesFileException {
         return new HashSet<>(Arrays.asList(
                 readFromProperties("semd.folders_without_structure")
                         .split(",")));
@@ -88,9 +88,9 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         } // todo убрать упоминание папки deleted в будущем
         int depth = getDepth(dir);
         if (depth == 1) {
-            System.out.println("\nНазвание папки: " + dir.getFileName());
+            System.out.println("\n** Название папки: " + dir.getFileName() + " **");
         } else if (depth == 2) {
-            System.out.println("\nНомер папки: " + dir.getFileName());
+            System.out.println("\n* Номер папки: " + dir.getFileName() + " *");
         }
         return FileVisitResult.CONTINUE;
     }
