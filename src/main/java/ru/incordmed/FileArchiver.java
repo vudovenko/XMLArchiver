@@ -196,12 +196,15 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
                                   ZipOutputStream zipOutputStream)
             throws IOException {
         for (Path fileToZip : folderFileCounts.get(dir)) {
-//            BasicFileAttributes fileAttributes
-//                    = Files.readAttributes(fileToZip, BasicFileAttributes.class);
+            // Получение оригинальных атрибутов файла
+            BasicFileAttributes attrs = Files.readAttributes(fileToZip, BasicFileAttributes.class);
 
             ZipEntry zipEntry = new ZipEntry(fileToZip
                     .getFileName().toString());
-//            zipEntry.setCreationTime(fileAttributes.creationTime());
+            // Установка оригинальных атрибутов для ZipEntry
+            zipEntry.setCreationTime(attrs.creationTime());
+            zipEntry.setLastModifiedTime(attrs.lastModifiedTime());
+            zipEntry.setLastAccessTime(attrs.lastAccessTime());
 
             System.out.println("Запись файла " + fileToZip
                     + " в архив");
@@ -209,10 +212,14 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             zipOutputStream.write(Files.readAllBytes(fileToZip)); // Добавляем в архив
             zipOutputStream.closeEntry();
 
-//            System.out.println("Перенос файла " + fileToZip
-//                    + " в папку для удаленных файлов");
-//            Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
-//                    + dir.getFileName() + File.separator + fileToZip.getFileName()));
+            deleteFiles(dir, pathDeletedFolders, fileToZip);
         }
+    }
+
+    private static void deleteFiles(Path dir, Path pathDeletedFolders, Path fileToZip) throws IOException {
+        System.out.println("Перенос файла " + fileToZip
+                + " в папку для удаленных файлов");
+        Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
+                + dir.getFileName() + File.separator + fileToZip.getFileName()));
     }
 }
