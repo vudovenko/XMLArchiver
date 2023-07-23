@@ -20,13 +20,10 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private Path mainDirectoryWithFiles;
     private Map<Path, List<Path>> folderFileCounts;
     private Set<String> foldersWithoutStructure;
-    private String folderForDeletedFiles;
 
     public void calculateFolders() {
         this.mainDirectoryWithFiles = getPathToProgramDirectory();
         this.folderFileCounts = new HashMap<>();
-        // todo удалить, когда будет добавлено полноценное удаление файлов
-        folderForDeletedFiles = mainDirectoryWithFiles + File.separator + "deleted";
         try {
             int semdMonthString = Integer.parseInt(readFromProperties("semd.month"));
             System.out.println("\nПолучили месяц создания файла: " + semdMonthString);
@@ -81,11 +78,6 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-        if (dir.toString()
-                .equals(mainDirectoryWithFiles
-                        + File.separator + "deleted")) {
-            return FileVisitResult.SKIP_SUBTREE;
-        } // todo убрать упоминание папки deleted в будущем
         int depth = getDepth(dir);
         if (depth == 1) {
             System.out.println("\n** Название папки: " + dir.getFileName() + " **");
@@ -134,8 +126,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     }
 
     @Override
-    public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-            throws IOException {
+    public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
         if (getDepth(dir) == 2
                 || foldersWithoutStructure
                 .contains(dir.getFileName().toString())) {
@@ -151,33 +142,16 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         return FileVisitResult.CONTINUE;
     }
 
-    private void addToArchive(Path dir) throws IOException {
-        Path pathDeletedFolders = getStorageFolderPath(dir, folderForDeletedFiles);
-
+    private void addToArchive(Path dir) {
         Path archiveName = Paths.get(dir + File.separator
                 + getArchiveName(dir));
         System.out.println("\nСоздание архива для файлов: " + archiveName);
         try (ZipOutputStream zipOutputStream
-                     = new ZipOutputStream(
-                Files.newOutputStream(archiveName))) {
-            Path pathDeletedFolders1 = Paths.get(pathDeletedFolders
-                    + File.separator + dir.getFileName());
-            if (!Files.exists(pathDeletedFolders1)) {
-                System.out.println("Создание директории " +
-                        "для удаленных файлов " + pathDeletedFolders1);
-                Files.createDirectory(pathDeletedFolders1);
-            }
-            addingFilesToZip(dir, pathDeletedFolders, zipOutputStream);
+                     = new ZipOutputStream(Files.newOutputStream(archiveName))) {
+            addingFilesToZip(dir, zipOutputStream);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private Path getStorageFolderPath(Path dir, String folder) throws IOException {
-        Path archivePath = Paths.get(folder + File.separator
-                + dir.getParent().getFileName());
-        Files.createDirectories(archivePath);
-        return archivePath;
     }
 
     private String getArchiveName(Path dir) {
@@ -192,8 +166,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
                 dir.getParent().getFileName().toString());
     }
 
-    private void addingFilesToZip(Path dir, Path pathDeletedFolders,
-                                  ZipOutputStream zipOutputStream)
+    private void addingFilesToZip(Path dir, ZipOutputStream zipOutputStream)
             throws IOException {
         for (Path fileToZip : folderFileCounts.get(dir)) {
             // Получение оригинальных атрибутов файла
@@ -212,14 +185,12 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             zipOutputStream.write(Files.readAllBytes(fileToZip)); // Добавляем в архив
             zipOutputStream.closeEntry();
 
-            deleteFiles(dir, pathDeletedFolders, fileToZip);
+            deleteFiles(fileToZip);
         }
     }
 
-    private static void deleteFiles(Path dir, Path pathDeletedFolders, Path fileToZip) throws IOException {
-        System.out.println("Перенос файла " + fileToZip
-                + " в папку для удаленных файлов");
-        Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
-                + dir.getFileName() + File.separator + fileToZip.getFileName()));
+    private static void deleteFiles(Path fileToZip) throws IOException {
+        System.out.println("Удаление файла " + fileToZip);
+        Files.delete(fileToZip);
     }
 }
