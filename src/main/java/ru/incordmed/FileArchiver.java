@@ -88,9 +88,9 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         } // todo убрать упоминание папки deleted в будущем
         int depth = getDepth(dir);
         if (depth == 1) {
-            System.out.println("\nНазвание папки: " + dir.getFileName());
+            System.out.println("\n** Название папки: " + dir.getFileName() + " **");
         } else if (depth == 2) {
-            System.out.println("\nНомер папки: " + dir.getFileName());
+            System.out.println("\n* Номер папки: " + dir.getFileName() + " *");
         }
         return FileVisitResult.CONTINUE;
     }
@@ -196,15 +196,30 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
                                   ZipOutputStream zipOutputStream)
             throws IOException {
         for (Path fileToZip : folderFileCounts.get(dir)) {
+            // Получение оригинальных атрибутов файла
+            BasicFileAttributes attrs = Files.readAttributes(fileToZip, BasicFileAttributes.class);
 
             ZipEntry zipEntry = new ZipEntry(fileToZip
                     .getFileName().toString());
+            // Установка оригинальных атрибутов для ZipEntry
+            zipEntry.setCreationTime(attrs.creationTime());
+            zipEntry.setLastModifiedTime(attrs.lastModifiedTime());
+            zipEntry.setLastAccessTime(attrs.lastAccessTime());
 
             System.out.println("Запись файла " + fileToZip
                     + " в архив");
             zipOutputStream.putNextEntry(zipEntry);
             zipOutputStream.write(Files.readAllBytes(fileToZip)); // Добавляем в архив
             zipOutputStream.closeEntry();
+
+            deleteFiles(dir, pathDeletedFolders, fileToZip);
         }
+    }
+
+    private static void deleteFiles(Path dir, Path pathDeletedFolders, Path fileToZip) throws IOException {
+        System.out.println("Перенос файла " + fileToZip
+                + " в папку для удаленных файлов");
+        Files.move(fileToZip, Paths.get(pathDeletedFolders + File.separator
+                + dir.getFileName() + File.separator + fileToZip.getFileName()));
     }
 }
