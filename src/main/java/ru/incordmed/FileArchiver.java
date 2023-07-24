@@ -60,12 +60,6 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private HashSet<String> getFoldersWithoutStructure() throws MissingPropertiesFileException {
-        return new HashSet<>(Arrays.asList(
-                readFromProperties("semd.folders_without_structure")
-                        .split(",")));
-    }
-
     private void setFileCreationDate(int year, int month) throws IncorrectDateException {
         if (year < 0) {
             throw new IncorrectDateException("Некорректный год: " + year);
@@ -74,6 +68,11 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
         this.fileCreationDate = LocalDate.of(year, month, 1);
         System.out.println("Поиск по дате создания файла: " + fileCreationDate);
+    }
+
+    private static void deleteFile(Path fileToZip) throws IOException {
+        System.out.println("Удаление файла " + fileToZip);
+        Files.delete(fileToZip);
     }
 
     @Override
@@ -136,13 +135,13 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             System.out.println("\nДиректория: " + dir
                     + "\nКоличество файлов для архивации: " + numberFiles);
             if (numberFiles != 0) {
-                addToArchive(dir);
+                addDirToArchive(dir);
             }
         }
         return FileVisitResult.CONTINUE;
     }
 
-    private void addToArchive(Path dir) {
+    private void addDirToArchive(Path dir) {
         Path archiveName = Paths.get(dir + File.separator
                 + getArchiveName(dir));
         System.out.println("\nСоздание архива для файлов: " + archiveName);
@@ -154,16 +153,10 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private String getArchiveName(Path dir) {
-        /*
-            Пример, СЭМДы номер 1 за июнь 2023:
-            2023_06_1_OutputQueryLost.zip
-        */
-        return String.format("%d_%02d_%s_%s.zip",
-                fileCreationDate.getYear(),
-                fileCreationDate.getMonthValue(),
-                dir.getFileName().toString(),
-                dir.getParent().getFileName().toString());
+    private HashSet<String> getFoldersWithoutStructure() throws MissingPropertiesFileException {
+        return new HashSet<>(Arrays.asList(
+                readFromProperties("semd.folders_without_structure")
+                        .split(",")));
     }
 
     private void addingFilesToZip(Path dir, ZipOutputStream zipOutputStream)
@@ -185,12 +178,19 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             zipOutputStream.write(Files.readAllBytes(fileToZip)); // Добавляем в архив
             zipOutputStream.closeEntry();
 
-            deleteFiles(fileToZip);
+            deleteFile(fileToZip);
         }
     }
 
-    private static void deleteFiles(Path fileToZip) throws IOException {
-        System.out.println("Удаление файла " + fileToZip);
-        Files.delete(fileToZip);
+    private String getArchiveName(Path dir) {
+        /*
+            Пример, СЭМДы номер 1 за июнь 2023:
+            2023_06_1_OutputQueryLost.zip
+        */
+        return String.format("%d_%02d_%s_%s.zip",
+                fileCreationDate.getYear(),
+                fileCreationDate.getMonthValue(),
+                dir.getFileName().toString(),
+                dir.getParent().getFileName().toString());
     }
 }
