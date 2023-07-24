@@ -20,12 +20,43 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private Path mainDirectoryWithFiles;
     private Map<Path, List<Path>> folderFileCounts;
     private Set<String> foldersWithoutStructure;
+    private String pathToPropertiesFile;
+
+    private static Set<String> getFolderNames(Properties properties) {
+        Set<String> propertyValues = new HashSet<>();
+        for (String propertyValue : properties.stringPropertyNames()) {
+            if (!propertyValue.equals("semd.month")) {
+                propertyValues.add(properties.getProperty(propertyValue));
+            }
+        }
+        return propertyValues;
+    }
+
+    public Path getPathToProgramDirectory() {
+        return Paths.get(System.getProperty("user.dir"));
+    }
+
+    private static void deleteFile(Path fileToZip) throws IOException {
+        System.out.println("Удаление файла " + fileToZip);
+        Files.delete(fileToZip);
+    }
+
+    private void setFileCreationDate(int year, int month) throws IncorrectDateException {
+        if (year < 0) {
+            throw new IncorrectDateException("Некорректный год: " + year);
+        } else if (month < 1 || month > 12) {
+            throw new IncorrectDateException("Некорректный месяц: " + month);
+        }
+        this.fileCreationDate = LocalDate.of(year, month, 1);
+        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
+    }
 
     public void calculateFolders() {
         this.mainDirectoryWithFiles = getPathToProgramDirectory();
+        this.pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
         this.folderFileCounts = new HashMap<>();
         try {
-            int semdMonthString = Integer.parseInt(readFromProperties("semd.month"));
+            int semdMonthString = Integer.parseInt(readParameterFromProperties("semd.month"));
             System.out.println("\nПолучили месяц создания файла: " + semdMonthString);
             setFileCreationDate(LocalDate.now().getYear(), semdMonthString);
 
@@ -41,38 +72,15 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    public Path getPathToProgramDirectory() {
-        return Paths.get(System.getProperty("user.dir"));
-    }
-
-    private String readFromProperties(String propertyValue) throws MissingPropertiesFileException {
+    private String readParameterFromProperties(String propertyValue) throws MissingPropertiesFileException {
         Properties properties = new Properties();
-        String pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
         try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
             properties.load(inputStream);
-            System.out.println("\nФайл vimis_archive.properties найден." +
-                    "\nЕго путь: " + pathToPropertiesFile);
             return properties.getProperty(propertyValue);
-
         } catch (IOException e) {
             throw new MissingPropertiesFileException(
                     String.format("\nФайл vimis_archive.properties по пути %s не найден!", pathToPropertiesFile));
         }
-    }
-
-    private void setFileCreationDate(int year, int month) throws IncorrectDateException {
-        if (year < 0) {
-            throw new IncorrectDateException("Некорректный год: " + year);
-        } else if (month < 1 || month > 12) {
-            throw new IncorrectDateException("Некорректный месяц: " + month);
-        }
-        this.fileCreationDate = LocalDate.of(year, month, 1);
-        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
-    }
-
-    private static void deleteFile(Path fileToZip) throws IOException {
-        System.out.println("Удаление файла " + fileToZip);
-        Files.delete(fileToZip);
     }
 
     @Override
@@ -153,10 +161,15 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private HashSet<String> getFoldersWithoutStructure() throws MissingPropertiesFileException {
-        return new HashSet<>(Arrays.asList(
-                readFromProperties("semd.folders_without_structure")
-                        .split(",")));
+    private Set<String> getFoldersWithoutStructure() throws MissingPropertiesFileException {
+        Properties properties = new Properties();
+        try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
+            properties.load(inputStream);
+            return getFolderNames(properties);
+        } catch (IOException e) {
+            throw new MissingPropertiesFileException(
+                    String.format("\nФайл vimis_archive.properties по пути %s не найден!", pathToPropertiesFile));
+        }
     }
 
     private void addingFilesToZip(Path dir, ZipOutputStream zipOutputStream)
