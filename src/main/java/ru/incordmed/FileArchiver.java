@@ -1,6 +1,7 @@
 package ru.incordmed;
 
 import ru.incordmed.exceptions.IncorrectDateException;
+import ru.incordmed.exceptions.MissingMonthInPropertiesException;
 import ru.incordmed.exceptions.MissingPropertiesFileException;
 
 import java.io.File;
@@ -20,12 +21,13 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private Path mainDirectoryWithFiles;
     private Map<Path, List<Path>> folderFileCounts;
     private Set<String> foldersWithoutStructure;
+    private Set<String> foldersWithStructure;
     private String pathToPropertiesFile;
 
-    private static Set<String> getFolderNames(Properties properties) {
+    private static Set<String> getListValues(Properties properties, String propertyName) {
         Set<String> propertyValues = new HashSet<>();
         for (String propertyValue : properties.stringPropertyNames()) {
-            if (!propertyValue.equals("semd.month")) {
+            if (propertyValue.contains(propertyName)) {
                 propertyValues.add(properties.getProperty(propertyValue));
             }
         }
@@ -56,31 +58,35 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         this.pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
         this.folderFileCounts = new HashMap<>();
         try {
-            int semdMonthString = Integer.parseInt(readParameterFromProperties("semd.month"));
+            int semdMonthString = Integer.parseInt(getMonthFromProperties());
             System.out.println("\nПолучили месяц создания файла: " + semdMonthString);
             setFileCreationDate(LocalDate.now().getYear(), semdMonthString);
 
-            foldersWithoutStructure = getFoldersWithoutStructure();
+            foldersWithStructure = getPropertyValues("semd.with-structure");
+            System.out.println("\nПолучен список папок со структурой: " + foldersWithStructure);
+
+            foldersWithoutStructure = getPropertyValues("semd.without-structure");
             System.out.println("\nПолучен список папок без структуры: " + foldersWithoutStructure);
 
             System.out.println("\nНачало обхода файловой системы...");
             Files.walkFileTree(mainDirectoryWithFiles, this);
             System.out.println("\nОбход файловой системы завершен.");
-        } catch (IncorrectDateException | IOException e) {
+        } catch (IncorrectDateException | IOException | MissingMonthInPropertiesException e) {
             e.printStackTrace();
             System.exit(1);
         }
     }
 
-    private String readParameterFromProperties(String propertyValue) throws MissingPropertiesFileException {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
-            properties.load(inputStream);
-            return properties.getProperty(propertyValue);
-        } catch (IOException e) {
-            throw new MissingPropertiesFileException(
-                    String.format("\nФайл vimis_archive.properties по пути %s не найден!", pathToPropertiesFile));
+    private String getMonthFromProperties() throws MissingPropertiesFileException, MissingMonthInPropertiesException {
+        String parameter = "semd.month";
+        Optional<String> month = getPropertyValues(parameter)
+                .stream()
+                .filter(value -> value.contains(parameter))
+                .findFirst();
+        if (month.isPresent()) {
+            return month.get();
         }
+        throw new MissingMonthInPropertiesException("Отсутствует месяц в файле vimis_archive.properties");
     }
 
     @Override
@@ -100,7 +106,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        if (getDepth(file) == 3
+        if (foldersWithStructure
+                .contains(file.getParent().getFileName().toString())
                 || foldersWithoutStructure
                 .contains(file.getParent().getFileName().toString())) {
             System.out.println("\nФайл: " + file.getFileName()
@@ -134,7 +141,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-        if (getDepth(dir) == 2
+        if (foldersWithStructure
+                .contains(dir.getFileName().toString())
                 || foldersWithoutStructure
                 .contains(dir.getFileName().toString())) {
             int numberFiles = folderFileCounts.get(dir) != null
@@ -161,11 +169,11 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private Set<String> getFoldersWithoutStructure() throws MissingPropertiesFileException {
+    private Set<String> getPropertyValues(String propertyName) throws MissingPropertiesFileException {
         Properties properties = new Properties();
         try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
             properties.load(inputStream);
-            return getFolderNames(properties);
+            return getListValues(properties, propertyName);
         } catch (IOException e) {
             throw new MissingPropertiesFileException(
                     String.format("\nФайл vimis_archive.properties по пути %s не найден!", pathToPropertiesFile));
