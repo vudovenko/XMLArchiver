@@ -23,6 +23,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private Set<String> foldersWithoutStructure;
     private Set<String> foldersWithStructure;
     private String pathToPropertiesFile;
+    private Long totalNumberFiles = 0L;
 
     public void calculateFolders() {
         this.mainDirectoryWithFiles = getPathToDirectoryForArchiving();
@@ -41,7 +42,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
             System.out.println("\nНачало обхода файловой системы...");
             Files.walkFileTree(mainDirectoryWithFiles, this);
-            System.out.println("\nОбход файловой системы завершен.");
+            System.out.println("\nПоиск файлов по дате создания до " + fileCreationDate + " завершен." +
+                    "\nВсего файлов добавлено в архивы: " + totalNumberFiles);
         } catch (IncorrectDateException | IOException | MissingMonthInPropertiesException e) {
             e.printStackTrace();
             System.exit(1);
@@ -75,8 +77,12 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         } else if (month < 1 || month > 12) {
             throw new IncorrectDateException("Некорректный месяц: " + month);
         }
-        this.fileCreationDate = LocalDate.of(year, month, 1);
-        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
+        if (month == 12) {
+            fileCreationDate = LocalDate.of(year + 1, 1, 1);
+        } else {
+            fileCreationDate = LocalDate.of(year, month + 1, 1);
+        }
+        System.out.println("Поиск файлов по дате создания до: " + fileCreationDate);
     }
 
     private Set<String> getPropertyValues(String propertyName) throws MissingPropertiesFileException {
@@ -164,6 +170,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             System.out.println("\nДиректория: " + dir
                     + "\nКоличество файлов для архивации: " + numberFiles);
             if (numberFiles != 0) {
+                totalNumberFiles += numberFiles;
                 addDirToArchive(dir);
             }
         }
@@ -186,13 +193,9 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             Пример, СЭМДы номер 1 за июнь 2023:
             2023_06_1_OutputQueryLost.zip
         */
-        String archiveName = String.format("%d_%02d_%s_%s.zip",
-                fileCreationDate.getYear(),
-                fileCreationDate.getMonthValue(),
-                dir.getFileName().toString(),
-                dir.getParent().getFileName().toString());
+        String archiveName = getCorrectDate(dir);
         Path archivePath = Paths.get(dir + File.separator + archiveName);
-        System.out.println("Имя архива: " + archivePath);
+        System.out.println("Имя архива: " + archivePath.getFileName());
         while (Files.exists(archivePath)) {
             System.out.println("Такой архив существует: " + archivePath.getFileName());
             archivePath = Paths.get(dir + File.separator
@@ -200,6 +203,21 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             System.out.println("Новое имя для архива: " + archivePath.getFileName());
         }
         return archivePath;
+    }
+
+    private String getCorrectDate(Path dir) {
+        if (fileCreationDate.getMonthValue() == 1) {
+            return String.format("%d_%02d_%s_%s.zip",
+                    fileCreationDate.getYear() - 1,
+                    12,
+                    dir.getFileName().toString(),
+                    dir.getParent().getFileName().toString());
+        }
+        return String.format("%d_%02d_%s_%s.zip",
+                fileCreationDate.getYear(),
+                fileCreationDate.getMonthValue() - 1,
+                dir.getFileName().toString(),
+                dir.getParent().getFileName().toString());
     }
 
     private void addingFilesToZip(Path dir, ZipOutputStream zipOutputStream)
