@@ -61,7 +61,6 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         String parameter = "semd.month";
         Optional<String> month = getPropertyValues(parameter)
                 .stream()
-                .filter(value -> value.contains(parameter))
                 .findFirst();
         if (month.isPresent()) {
             return month.get();
