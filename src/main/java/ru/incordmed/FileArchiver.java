@@ -26,7 +26,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     public void calculateFolders() {
         this.mainDirectoryWithFiles = getPathToDirectoryForArchiving();
-        this.pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
+        this.pathToPropertiesFile = getPathToProjectFolder() + File.separator + "vimis_archive.properties";
         this.folderFileCounts = new HashMap<>();
         try {
             int semdMonthString = Integer.parseInt(getMonthFromProperties());
@@ -48,8 +48,12 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    public Path getPathToDirectoryForArchiving() {
-        return Paths.get(System.getProperty("user.dir")).getParent();
+    private Path getPathToDirectoryForArchiving() {
+        return getPathToProjectFolder().getParent();
+    }
+
+    private Path getPathToProjectFolder() {
+        return Paths.get(System.getProperty("user.dir"));
     }
 
     private String getMonthFromProperties()
