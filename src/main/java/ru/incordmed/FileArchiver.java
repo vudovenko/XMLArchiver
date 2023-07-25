@@ -24,35 +24,6 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     private Set<String> foldersWithStructure;
     private String pathToPropertiesFile;
 
-    private static Set<String> getListValues(Properties properties, String propertyName) {
-        Set<String> propertyValues = new HashSet<>();
-        for (String propertyValue : properties.stringPropertyNames()) {
-            if (propertyValue.contains(propertyName)) {
-                propertyValues.add(properties.getProperty(propertyValue));
-            }
-        }
-        return propertyValues;
-    }
-
-    public Path getPathToDirectoryForArchiving() {
-        return Paths.get(System.getProperty("user.dir")).getParent();
-    }
-
-    private static void deleteFile(Path fileToZip) throws IOException {
-        System.out.println("Удаление файла " + fileToZip);
-        Files.delete(fileToZip);
-    }
-
-    private void setFileCreationDate(int year, int month) throws IncorrectDateException {
-        if (year < 0) {
-            throw new IncorrectDateException("Некорректный год: " + year);
-        } else if (month < 1 || month > 12) {
-            throw new IncorrectDateException("Некорректный месяц: " + month);
-        }
-        this.fileCreationDate = LocalDate.of(year, month, 1);
-        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
-    }
-
     public void calculateFolders() {
         this.mainDirectoryWithFiles = getPathToDirectoryForArchiving();
         this.pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
@@ -77,7 +48,12 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private String getMonthFromProperties() throws MissingPropertiesFileException, MissingMonthInPropertiesException {
+    public Path getPathToDirectoryForArchiving() {
+        return Paths.get(System.getProperty("user.dir")).getParent();
+    }
+
+    private String getMonthFromProperties()
+            throws MissingPropertiesFileException, MissingMonthInPropertiesException {
         String parameter = "semd.month";
         Optional<String> month = getPropertyValues(parameter)
                 .stream()
@@ -86,7 +62,40 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         if (month.isPresent()) {
             return month.get();
         }
-        throw new MissingMonthInPropertiesException("Отсутствует месяц в файле vimis_archive.properties");
+        throw new MissingMonthInPropertiesException(
+                "Отсутствует месяц в файле vimis_archive.properties");
+    }
+
+    private void setFileCreationDate(int year, int month) throws IncorrectDateException {
+        if (year < 0) {
+            throw new IncorrectDateException("Некорректный год: " + year);
+        } else if (month < 1 || month > 12) {
+            throw new IncorrectDateException("Некорректный месяц: " + month);
+        }
+        this.fileCreationDate = LocalDate.of(year, month, 1);
+        System.out.println("Поиск по дате создания файла: " + fileCreationDate);
+    }
+
+    private Set<String> getPropertyValues(String propertyName) throws MissingPropertiesFileException {
+        Properties properties = new Properties();
+        try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
+            properties.load(inputStream);
+            return getListValues(properties, propertyName);
+        } catch (IOException e) {
+            throw new MissingPropertiesFileException(
+                    String.format("\nФайл vimis_archive.properties по пути %s не найден!",
+                            pathToPropertiesFile));
+        }
+    }
+
+    private static Set<String> getListValues(Properties properties, String propertyName) {
+        Set<String> propertyValues = new HashSet<>();
+        for (String propertyValue : properties.stringPropertyNames()) {
+            if (propertyValue.contains(propertyName)) {
+                propertyValues.add(properties.getProperty(propertyValue));
+            }
+        }
+        return propertyValues;
     }
 
     @Override
@@ -169,15 +178,16 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private Set<String> getPropertyValues(String propertyName) throws MissingPropertiesFileException {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Files.newInputStream(Paths.get(pathToPropertiesFile))) {
-            properties.load(inputStream);
-            return getListValues(properties, propertyName);
-        } catch (IOException e) {
-            throw new MissingPropertiesFileException(
-                    String.format("\nФайл vimis_archive.properties по пути %s не найден!", pathToPropertiesFile));
-        }
+    private String getArchiveName(Path dir) {
+        /*
+            Пример, СЭМДы номер 1 за июнь 2023:
+            2023_06_1_OutputQueryLost.zip
+        */
+        return String.format("%d_%02d_%s_%s.zip",
+                fileCreationDate.getYear(),
+                fileCreationDate.getMonthValue(),
+                dir.getFileName().toString(),
+                dir.getParent().getFileName().toString());
     }
 
     private void addingFilesToZip(Path dir, ZipOutputStream zipOutputStream)
@@ -203,15 +213,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private String getArchiveName(Path dir) {
-        /*
-            Пример, СЭМДы номер 1 за июнь 2023:
-            2023_06_1_OutputQueryLost.zip
-        */
-        return String.format("%d_%02d_%s_%s.zip",
-                fileCreationDate.getYear(),
-                fileCreationDate.getMonthValue(),
-                dir.getFileName().toString(),
-                dir.getParent().getFileName().toString());
+    private static void deleteFile(Path fileToZip) throws IOException {
+        System.out.println("Удаление файла " + fileToZip);
+        Files.delete(fileToZip);
     }
 }
