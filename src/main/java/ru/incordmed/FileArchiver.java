@@ -34,8 +34,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         return propertyValues;
     }
 
-    public Path getPathToProgramDirectory() {
-        return Paths.get(System.getProperty("user.dir"));
+    public Path getPathToDirectoryForArchiving() {
+        return Paths.get(System.getProperty("user.dir")).getParent();
     }
 
     private static void deleteFile(Path fileToZip) throws IOException {
@@ -54,7 +54,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     }
 
     public void calculateFolders() {
-        this.mainDirectoryWithFiles = getPathToProgramDirectory();
+        this.mainDirectoryWithFiles = getPathToDirectoryForArchiving();
         this.pathToPropertiesFile = mainDirectoryWithFiles + File.separator + "vimis_archive.properties";
         this.folderFileCounts = new HashMap<>();
         try {
