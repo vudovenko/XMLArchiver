@@ -125,7 +125,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
             System.out.println("\nФайл: " + file.getFileName()
                     + "\nДата создания: " + attrs.creationTime()
                     + "\nРодительская директория: " + file.getParent());
-            if (isFileBeforeCreationDate(attrs)) {
+            if (isFileBeforeCreationDate(attrs)
+                    && !file.getFileName().toString().contains(".zip")) {
                 System.out.println("Файл " + file.getFileName()
                         + " будет добавлен в архив");
                 increaseNumberFilesInFolder(file);
@@ -170,8 +171,7 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
     }
 
     private void addDirToArchive(Path dir) {
-        Path archiveName = Paths.get(dir + File.separator
-                + getArchiveName(dir));
+        Path archiveName = getArchiveName(dir);
         System.out.println("\nСоздание архива для файлов: " + archiveName);
         try (ZipOutputStream zipOutputStream
                      = new ZipOutputStream(Files.newOutputStream(archiveName))) {
@@ -181,16 +181,25 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
         }
     }
 
-    private String getArchiveName(Path dir) {
+    private Path getArchiveName(Path dir) {
         /*
             Пример, СЭМДы номер 1 за июнь 2023:
             2023_06_1_OutputQueryLost.zip
         */
-        return String.format("%d_%02d_%s_%s.zip",
+        String archiveName = String.format("%d_%02d_%s_%s.zip",
                 fileCreationDate.getYear(),
                 fileCreationDate.getMonthValue(),
                 dir.getFileName().toString(),
                 dir.getParent().getFileName().toString());
+        Path archivePath = Paths.get(dir + File.separator + archiveName);
+        System.out.println("Имя архива: " + archivePath);
+        while (Files.exists(archivePath)) {
+            System.out.println("Такой архив существует: " + archivePath.getFileName());
+            archivePath = Paths.get(dir + File.separator
+                    + archivePath.getFileName().toString().replace(".zip", "_1.zip"));
+            System.out.println("Новое имя для архива: " + archivePath.getFileName());
+        }
+        return archivePath;
     }
 
     private void addingFilesToZip(Path dir, ZipOutputStream zipOutputStream)
