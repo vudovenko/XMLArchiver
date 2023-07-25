@@ -118,8 +118,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        if (foldersWithStructure
-                .contains(file.getParent().getFileName().toString())
+        if ((getDepth(file) == 3 && foldersWithStructure
+                .contains(file.getParent().getParent().getFileName().toString()))
                 || foldersWithoutStructure
                 .contains(file.getParent().getFileName().toString())) {
             System.out.println("\nФайл: " + file.getFileName()
@@ -153,8 +153,8 @@ public class FileArchiver extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-        if (foldersWithStructure
-                .contains(dir.getFileName().toString())
+        if (getDepth(dir) == 2 && foldersWithStructure
+                .contains(dir.getParent().getFileName().toString())
                 || foldersWithoutStructure
                 .contains(dir.getFileName().toString())) {
             int numberFiles = folderFileCounts.get(dir) != null
